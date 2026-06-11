@@ -5,6 +5,10 @@ production-grade LLM evaluation patterns. You speak a question, the assistant
 answers vocally, and **every** response is automatically scored by a second LLM
 judge and logged to a live monitoring dashboard.
 
+<img width="1285" height="901" alt="image" src="https://github.com/user-attachments/assets/fde506bb-99c0-4331-9a12-31836c937ce2" />
+
+<img width="1260" height="903" alt="image" src="https://github.com/user-attachments/assets/027a8380-c2c0-4a2a-bb84-99d086f221e1" />
+
 ```
 🎙  ElevenLabs STT  →  🧠 Mistral large  →  🔊 ElevenLabs TTS (streaming)
                               │
