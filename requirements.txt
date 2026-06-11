@@ -1,0 +1,14 @@
+# Voice pipeline
+elevenlabs==2.52.0
+sounddevice==0.5.1
+numpy==2.2.6
+
+# LLM + judge
+mistralai==1.12.4
+
+# Dashboard / API
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# Config
+python-dotenv==1.0.1
