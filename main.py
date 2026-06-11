@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import os
 import threading
-import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -84,24 +83,24 @@ def run_voice_loop() -> None:
     from services.judge_service import evaluate
     from services.llm_service import get_response_detailed
     from services.logger_service import load_logs, log_interaction
-    from services.stt_service import record_and_transcribe
+    from services.stt_service import record_and_transcribe_detailed
 
     print("\nVoice loop ready. Press Enter to ask a question (Ctrl+C to quit).")
 
     while True:
         try:
-            input("\n> Press Enter to start recording...")
+            input("\n> Press Enter to START speaking (Enter again to STOP)...")
         except (EOFError, KeyboardInterrupt):
             print("\nExiting voice loop.")
             return
 
-        # 1. STT
-        stt_start = time.perf_counter()
-        transcript = record_and_transcribe()
-        stt_ms = int((time.perf_counter() - stt_start) * 1000)
-        if not transcript:
+        # 1. STT (records until the user presses Enter again)
+        stt = record_and_transcribe_detailed()
+        if not stt:
             print("[LOOP] No transcript, skipping.")
             continue
+        transcript = stt.text
+        stt_ms = stt.latency_ms
 
         # 2. LLM
         try:
