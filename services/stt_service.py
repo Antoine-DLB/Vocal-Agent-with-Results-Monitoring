@@ -1,7 +1,13 @@
-"""ElevenLabs Speech-to-Text service: microphone capture -> transcript.
+"""ElevenLabs Speech-to-Text service: audio -> transcript.
 
-Recording is push-to-talk style: it starts immediately and runs until the user
-presses Enter, so the user can speak for as long as they need (no fixed window).
+Two entry points share the same transcription core:
+- `record_and_transcribe_detailed()` captures from the local microphone
+  (push-to-talk: records until the user presses Enter).
+- `transcribe_audio()` transcribes an already-captured audio blob, e.g. one
+  uploaded from the browser by the web chat UI.
+
+`sounddevice`/PortAudio is imported lazily inside the microphone path only, so
+the web path works on machines without audio hardware.
 """
 
 from __future__ import annotations
@@ -13,11 +19,6 @@ import wave
 from dataclasses import dataclass
 
 import numpy as np
-
-# sounddevice imports PortAudio at import time. It is only needed for the
-# (audio-dependent) capture step, so the import lives here at module scope on
-# purpose: a machine running the voice loop is expected to have PortAudio.
-import sounddevice as sd
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
 
@@ -43,12 +44,47 @@ def _build_client() -> ElevenLabs:
     return ElevenLabs(api_key=api_key)
 
 
+def _transcribe(file_bytes: bytes, name: str) -> STTResult | None:
+    """Send raw audio bytes to ElevenLabs STT and return transcript + latency."""
+    try:
+        client = _build_client()
+        audio_file = io.BytesIO(file_bytes)
+        audio_file.name = name  # the SDK derives the mime type from the name
+        started = time.perf_counter()
+        result = client.speech_to_text.convert(model_id=STT_MODEL_ID, file=audio_file)
+        latency_ms = int((time.perf_counter() - started) * 1000)
+        transcript = (getattr(result, "text", "") or "").strip()
+    except Exception as exc:
+        print(f"[STT] ElevenLabs STT error: {exc}")
+        return None
+
+    if not transcript:
+        print("[STT] Empty transcript (no speech detected).")
+        return None
+
+    print(f'[STT] Transcript: "{transcript}"')
+    return STTResult(text=transcript, latency_ms=latency_ms)
+
+
+def transcribe_audio(data: bytes, filename: str = "audio.webm") -> STTResult | None:
+    """Transcribe an uploaded audio blob (used by the web /api/chat endpoint)."""
+    if not data:
+        print("[STT] Empty audio upload.")
+        return None
+    return _transcribe(data, filename)
+
+
+# --------------------------------------------------------------------------- #
+# Local microphone capture (terminal voice loop)                              #
+# --------------------------------------------------------------------------- #
 def _record_until_enter() -> np.ndarray | None:
     """Record mono audio until the user presses Enter; return the samples.
 
     The PortAudio callback fills `frames` on its own thread while the main
     thread blocks on `input()`, so recording length is bounded only by the user.
     """
+    import sounddevice as sd  # lazy: PortAudio only needed for local capture
+
     frames: list[np.ndarray] = []
 
     def callback(indata, _frame_count, _time_info, status):  # noqa: ANN001
@@ -95,27 +131,7 @@ def record_and_transcribe_detailed() -> STTResult | None:
         print("[STT] No audio captured.")
         return None
 
-    try:
-        client = _build_client()
-        audio_file = io.BytesIO(_to_wav_bytes(audio))
-        audio_file.name = "recording.wav"  # the SDK uses the name for the mime type
-        started = time.perf_counter()
-        result = client.speech_to_text.convert(
-            model_id=STT_MODEL_ID,
-            file=audio_file,
-        )
-        latency_ms = int((time.perf_counter() - started) * 1000)
-        transcript = (getattr(result, "text", "") or "").strip()
-    except Exception as exc:
-        print(f"[STT] ElevenLabs STT error: {exc}")
-        return None
-
-    if not transcript:
-        print("[STT] Empty transcript (no speech detected).")
-        return None
-
-    print(f'[STT] Transcript: "{transcript}"')
-    return STTResult(text=transcript, latency_ms=latency_ms)
+    return _transcribe(_to_wav_bytes(audio), "recording.wav")
 
 
 def record_and_transcribe() -> str | None:
