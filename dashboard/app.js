@@ -28,6 +28,41 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// Lightweight, safe formatter: escapes first, then renders paragraphs, bullet /
+// numbered lists and **bold** so multi-point answers are readable instead of one
+// dense block.
+function inlineMd(s) {
+  return s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+}
+
+function formatResponse(text) {
+  const safe = escapeHtml(text || "");
+  const lines = safe.split(/\r?\n/);
+  let html = "";
+  let list = null; // "ul" | "ol" | null
+  const closeList = () => { if (list) { html += `</${list}>`; list = null; } };
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) { closeList(); continue; }
+
+    const ul = line.match(/^[-*•]\s+(.*)$/);
+    const ol = line.match(/^\d+[.)]\s+(.*)$/);
+    if (ul) {
+      if (list !== "ul") { closeList(); html += "<ul>"; list = "ul"; }
+      html += `<li>${inlineMd(ul[1])}</li>`;
+    } else if (ol) {
+      if (list !== "ol") { closeList(); html += "<ol>"; list = "ol"; }
+      html += `<li>${inlineMd(ol[1])}</li>`;
+    } else {
+      closeList();
+      html += `<p>${inlineMd(line)}</p>`;
+    }
+  }
+  closeList();
+  return html || `<p>${safe}</p>`;
+}
+
 // --------------------------------------------------------------------------- //
 // Voice chat                                                                  //
 // --------------------------------------------------------------------------- //
@@ -170,7 +205,7 @@ function renderTurn(data) {
   const coach = document.createElement("div");
   coach.className = "bubble coach";
   coach.innerHTML =
-    `<div class="who">Coach</div>${escapeHtml(data.response)}` +
+    `<div class="who">Coach</div><div class="text">${formatResponse(data.response)}</div>` +
     `<div class="meta">` +
       `<span>⭐ overall ${s.overall ?? "—"}/5</span>` +
       `<span>· relevance ${s.relevance ?? "—"} · concision ${s.concision ?? "—"} · tone ${s.tone ?? "—"}</span>` +
@@ -250,6 +285,7 @@ function renderChart(scoreOverTime) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       scales: {
         y: { min: 0, max: 5, ticks: { stepSize: 1, color: "#8b90a3" }, grid: { color: "#2a2e3c" } },
         x: { ticks: { color: "#8b90a3", maxRotation: 0, autoSkip: true }, grid: { color: "#2a2e3c" } },
@@ -299,3 +335,38 @@ async function refresh() {
 
 refresh();
 setInterval(refresh, REFRESH_MS);
+
+// --------------------------------------------------------------------------- //
+// Sidebar navigation (Coach / Monitoring) + collapse                          //
+// --------------------------------------------------------------------------- //
+const sidebar = document.getElementById("sidebar");
+const collapseBtn = document.getElementById("collapseBtn");
+const navItems = document.querySelectorAll(".nav-item");
+const views = {
+  coach: document.getElementById("view-coach"),
+  monitoring: document.getElementById("view-monitoring"),
+};
+
+function showView(name) {
+  if (!views[name]) name = "coach";
+  for (const [key, el] of Object.entries(views)) el.hidden = key !== name;
+  navItems.forEach((b) => b.classList.toggle("active", b.dataset.view === name));
+  localStorage.setItem("view", name);
+  if (name === "monitoring") {
+    // The chart may have been created while hidden (0 size) — refit it.
+    refresh().then(() => { if (scoreChart) scoreChart.resize(); });
+  }
+}
+
+navItems.forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
+
+function setCollapsed(collapsed) {
+  sidebar.classList.toggle("collapsed", collapsed);
+  collapseBtn.textContent = collapsed ? "»" : "«";
+  localStorage.setItem("collapsed", collapsed ? "true" : "false");
+}
+collapseBtn.addEventListener("click", () => setCollapsed(!sidebar.classList.contains("collapsed")));
+
+// Restore persisted UI state.
+setCollapsed(localStorage.getItem("collapsed") === "true");
+showView(localStorage.getItem("view") || "coach");

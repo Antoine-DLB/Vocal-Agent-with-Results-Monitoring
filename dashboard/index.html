@@ -9,41 +9,87 @@
     :root {
       --bg: #0f1117;
       --card: #1a1d27;
+      --sidebar: #14161f;
       --accent: #ff7a59;
       --accent-2: #59a6ff;
       --text: #e6e8ef;
       --muted: #8b90a3;
       --border: #2a2e3c;
+      --sidebar-w: 230px;
+      --sidebar-w-collapsed: 68px;
     }
     * { box-sizing: border-box; }
+    html, body { height: 100%; }
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: var(--bg);
       color: var(--text);
-      padding: 32px;
-      max-width: 1100px;
-      margin: 0 auto;
     }
-    h1 { font-size: 22px; margin: 0 0 4px; }
+
+    /* ===== App shell ===== */
+    .app { display: flex; min-height: 100vh; }
+
+    /* ===== Sidebar ===== */
+    .sidebar {
+      width: var(--sidebar-w);
+      flex: 0 0 auto;
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 18px 12px;
+      gap: 8px;
+      transition: width .18s ease;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+    .sidebar.collapsed { width: var(--sidebar-w-collapsed); }
+
+    .brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 14px; }
+    .brand .logo { font-size: 22px; flex: 0 0 auto; }
+    .brand .name { font-weight: 700; font-size: 14px; line-height: 1.2; white-space: nowrap; }
+    .brand .name small { display: block; color: var(--muted); font-weight: 400; font-size: 11px; }
+    .sidebar.collapsed .brand .name { display: none; }
+
+    .nav-item {
+      display: flex; align-items: center; gap: 12px;
+      width: 100%; border: none; cursor: pointer;
+      background: transparent; color: var(--muted);
+      padding: 11px 12px; border-radius: 9px; font-size: 14px;
+      text-align: left; transition: background .12s ease, color .12s ease;
+      white-space: nowrap;
+    }
+    .nav-item .ico { font-size: 18px; flex: 0 0 22px; text-align: center; }
+    .nav-item:hover { background: #1c1f2b; color: var(--text); }
+    .nav-item.active { background: #2a1c16; color: var(--accent); }
+    .sidebar.collapsed .nav-item .label { display: none; }
+    .sidebar.collapsed .nav-item { justify-content: center; gap: 0; }
+
+    .collapse-btn {
+      margin-top: auto; align-self: stretch;
+      background: transparent; border: 1px solid var(--border); color: var(--muted);
+      border-radius: 9px; padding: 9px; cursor: pointer; font-size: 14px;
+    }
+    .collapse-btn:hover { color: var(--text); border-color: var(--accent); }
+
+    /* ===== Content ===== */
+    .content { flex: 1 1 auto; padding: 28px 34px; max-width: 1000px; }
+    h1 { font-size: 21px; margin: 0 0 4px; }
     .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
-    .section-title { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 32px 0 14px; }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 20px;
-      margin-bottom: 24px;
-    }
+    [hidden] { display: none !important; }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 22px; }
     .card h2 { font-size: 15px; margin: 0 0 16px; font-weight: 600; }
 
-    /* --- Chat / mic --- */
+    /* ===== Chat / mic ===== */
     .mic-row { display: flex; align-items: center; gap: 18px; }
     #micBtn {
       width: 84px; height: 84px; border-radius: 50%;
       border: none; cursor: pointer; flex: 0 0 auto;
-      background: var(--accent); color: #14110f;
-      font-size: 32px; display: flex; align-items: center; justify-content: center;
+      background: var(--accent); color: #14110f; font-size: 32px;
+      display: flex; align-items: center; justify-content: center;
       transition: transform .08s ease, box-shadow .15s ease, background .15s ease;
       user-select: none; -webkit-user-select: none; touch-action: none;
     }
@@ -54,70 +100,95 @@
     .mic-help { font-size: 13px; color: var(--muted); }
     #status { font-size: 13px; margin-top: 4px; min-height: 18px; color: var(--accent-2); }
 
-    .thread { margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }
-    .bubble { padding: 12px 14px; border-radius: 10px; max-width: 80%; font-size: 14px; line-height: 1.45; }
+    .thread { margin-top: 18px; display: flex; flex-direction: column; gap: 14px; }
+    .bubble { padding: 12px 15px; border-radius: 12px; max-width: 82%; font-size: 14px; line-height: 1.5; }
     .bubble.user { align-self: flex-end; background: #243042; border: 1px solid #2f3d52; }
-    .bubble.coach { align-self: flex-start; background: #20241c; border: 1px solid #34402a; }
-    .bubble .who { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 4px; }
-    .bubble .meta { margin-top: 8px; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .bubble.coach { align-self: flex-start; background: #1d2118; border: 1px solid #34402a; }
+    .bubble .who { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 6px; }
+    .bubble .text p { margin: 0 0 10px; }
+    .bubble .text p:last-child { margin-bottom: 0; }
+    .bubble .text ul, .bubble .text ol { margin: 4px 0 10px; padding-left: 20px; }
+    .bubble .text li { margin: 3px 0; }
+    .bubble .text strong { color: #fff; }
+    .bubble .meta { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.06);
+                    font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .bubble .replay { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 2px 8px; cursor: pointer; font-size: 12px; }
+    .bubble .replay:hover { color: var(--text); border-color: var(--accent); }
     .empty-thread { color: var(--muted); font-size: 13px; }
 
-    /* --- Monitoring --- */
-    .stats { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
-    .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 22px; min-width: 180px; flex: 1; }
+    /* ===== Monitoring ===== */
+    .stats { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+    .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; min-width: 170px; flex: 1; }
     .stat-card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
     .stat-card .value { font-size: 28px; font-weight: 600; margin-top: 6px; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
     th { color: var(--muted); font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: .5px; }
-    td.q { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    td.q { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .badge { display: inline-block; background: #3a2018; color: var(--accent); border-radius: 4px; padding: 2px 7px; font-size: 11px; margin-right: 4px; }
     .score { font-weight: 600; }
     .muted { color: var(--muted); }
-    canvas { max-height: 280px; }
+    .chart-wrap { height: 280px; }
+    #scoreChart { width: 100% !important; height: 100% !important; }
   </style>
 </head>
 <body>
-  <h1>AI Career Coach — Voice Chat &amp; Monitoring</h1>
-  <div class="subtitle">Hold the mic, ask a question, release to send · every answer is scored by an LLM judge</div>
-
-  <!-- ===== Chat ===== -->
-  <div class="section-title">Talk to your coach</div>
-  <div class="card">
-    <div class="mic-row">
-      <button id="micBtn" title="Hold to talk">🎙️</button>
-      <div>
-        <div class="mic-help"><strong>Hold</strong> the mic (or press &amp; hold <strong>Space</strong>), speak, then release to send.</div>
-        <div id="status">Ready.</div>
+  <div class="app">
+    <!-- ===== Sidebar ===== -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <span class="logo">🧭</span>
+        <span class="name">AI Career Coach<small>Voice + LLM judge</small></span>
       </div>
-    </div>
-    <div class="thread" id="thread">
-      <div class="empty-thread">No conversation yet — hold the mic and ask something like “How do I get a job at Mistral AI?”</div>
-    </div>
-  </div>
+      <button class="nav-item active" data-view="coach"><span class="ico">🎙️</span><span class="label">Coach</span></button>
+      <button class="nav-item" data-view="monitoring"><span class="ico">📊</span><span class="label">Monitoring</span></button>
+      <button class="collapse-btn" id="collapseBtn" title="Collapse sidebar">«</button>
+    </aside>
 
-  <!-- ===== Monitoring ===== -->
-  <div class="section-title">Monitoring</div>
-  <div class="stats">
-    <div class="stat-card"><div class="label">Total interactions</div><div class="value" id="stat-total">—</div></div>
-    <div class="stat-card"><div class="label">Avg overall score</div><div class="value" id="stat-score">—</div></div>
-    <div class="stat-card"><div class="label">Avg LLM latency</div><div class="value" id="stat-latency">—</div></div>
-  </div>
+    <!-- ===== Content ===== -->
+    <main class="content">
+      <!-- Coach view -->
+      <section id="view-coach">
+        <h1>Talk to your AI Career Coach</h1>
+        <div class="subtitle">Hold the mic, ask a question, release to send · every answer is scored by an LLM judge</div>
+        <div class="card">
+          <div class="mic-row">
+            <button id="micBtn" title="Hold to talk">🎙️</button>
+            <div>
+              <div class="mic-help"><strong>Hold</strong> the mic (or press &amp; hold <strong>Space</strong>), speak, then release to send.</div>
+              <div id="status">Ready.</div>
+            </div>
+          </div>
+          <div class="thread" id="thread">
+            <div class="empty-thread">No conversation yet — hold the mic and ask something like “How do I get a job at Mistral AI?”</div>
+          </div>
+        </div>
+      </section>
 
-  <div class="card">
-    <h2>Overall score over time</h2>
-    <canvas id="scoreChart"></canvas>
-  </div>
-
-  <div class="card">
-    <h2>Last 10 interactions</h2>
-    <table>
-      <thead>
-        <tr><th>Timestamp</th><th>Question</th><th>Overall</th><th>Flags</th><th>LLM latency</th></tr>
-      </thead>
-      <tbody id="rows"><tr><td colspan="5" class="muted">Waiting for data…</td></tr></tbody>
-    </table>
+      <!-- Monitoring view -->
+      <section id="view-monitoring" hidden>
+        <h1>Monitoring</h1>
+        <div class="subtitle">Quality and latency for every interaction · auto-refresh every 10s</div>
+        <div class="stats">
+          <div class="stat-card"><div class="label">Total interactions</div><div class="value" id="stat-total">—</div></div>
+          <div class="stat-card"><div class="label">Avg overall score</div><div class="value" id="stat-score">—</div></div>
+          <div class="stat-card"><div class="label">Avg LLM latency</div><div class="value" id="stat-latency">—</div></div>
+        </div>
+        <div class="card">
+          <h2>Overall score over time</h2>
+          <div class="chart-wrap"><canvas id="scoreChart"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Last 10 interactions</h2>
+          <table>
+            <thead>
+              <tr><th>Timestamp</th><th>Question</th><th>Overall</th><th>Flags</th><th>LLM latency</th></tr>
+            </thead>
+            <tbody id="rows"><tr><td colspan="5" class="muted">Waiting for data…</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
   </div>
 
   <script src="/app.js"></script>
