@@ -36,56 +36,88 @@ const statusEl = document.getElementById("status");
 const threadEl = document.getElementById("thread");
 
 let mediaRecorder = null;
-let mediaStream = null;
+let mediaStream = null;       // kept alive after the first grant for instant restarts
 let chunks = [];
-let isRecording = false;
-let isBusy = false;
+let active = false;           // user is currently holding the mic / Space
+let recorderReady = false;    // MediaRecorder is actually running
+let isBusy = false;           // a turn is being processed by the server
 
 function setStatus(msg) {
   statusEl.textContent = msg;
 }
 
-async function startRecording() {
-  if (isRecording || isBusy) return;
+// Acquire the mic stream once and reuse it. Awaiting getUserMedia on every
+// press caused a race: a quick click resolved *after* release, so recording
+// started but was never stopped. Reusing the stream makes restarts synchronous.
+async function ensureStream() {
+  if (mediaStream) return mediaStream;
   if (!navigator.mediaDevices?.getUserMedia) {
-    setStatus("This browser does not support microphone capture.");
-    return;
+    throw new Error("getUserMedia unavailable (needs http://localhost or HTTPS)");
   }
-  try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch (err) {
-    setStatus("Microphone access denied.");
-    return;
-  }
+  mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  return mediaStream;
+}
+
+function startRecorder() {
   chunks = [];
-  mediaRecorder = new MediaRecorder(mediaStream);
-  mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-  mediaRecorder.onstop = sendAudio;
+  const opts =
+    window.MediaRecorder && MediaRecorder.isTypeSupported &&
+    MediaRecorder.isTypeSupported("audio/webm")
+      ? { mimeType: "audio/webm" }
+      : {};
+  mediaRecorder = new MediaRecorder(mediaStream, opts);
+  mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+  mediaRecorder.onstop = onRecordingStopped;
   mediaRecorder.start();
-  isRecording = true;
+  recorderReady = true;
+}
+
+async function beginTalk() {
+  if (isBusy || active) return;
+  active = true;
   micBtn.classList.add("recording");
+
+  if (!mediaStream) {
+    setStatus("Requesting microphone…");
+    try {
+      await ensureStream();
+    } catch (err) {
+      console.error("[mic] getUserMedia failed:", err);
+      setStatus("Microphone blocked. Allow access and open http://localhost:8000.");
+      active = false;
+      micBtn.classList.remove("recording");
+      return;
+    }
+    if (!active) {
+      // Released during the permission prompt: keep the stream for next time.
+      setStatus("Mic ready — hold the mic (or Space) and speak.");
+      micBtn.classList.remove("recording");
+      return;
+    }
+  }
+
+  startRecorder();
   setStatus("Listening… release to send.");
 }
 
-function stopRecording() {
-  if (!isRecording) return;
-  isRecording = false;
+function endTalk() {
+  if (!active) return;
+  active = false;
   micBtn.classList.remove("recording");
-  setStatus("Processing…");
-  if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
-}
 
-function releaseMic() {
-  if (mediaStream) {
-    mediaStream.getTracks().forEach((t) => t.stop());
-    mediaStream = null;
+  if (recorderReady && mediaRecorder && mediaRecorder.state !== "inactive") {
+    recorderReady = false;
+    setStatus("Processing…");
+    mediaRecorder.stop(); // fires onstop -> onRecordingStopped
+  } else {
+    // Recorder had not actually started yet (released too fast).
+    setStatus("Ready.");
   }
 }
 
-async function sendAudio() {
-  releaseMic();
-  const blob = new Blob(chunks, { type: "audio/webm" });
-  if (blob.size === 0) { setStatus("Nothing recorded. Try again."); return; }
+async function onRecordingStopped() {
+  const blob = new Blob(chunks, { type: (mediaRecorder && mediaRecorder.mimeType) || "audio/webm" });
+  if (blob.size === 0) { setStatus("Nothing recorded — hold a bit longer."); return; }
 
   isBusy = true;
   micBtn.disabled = true;
@@ -104,7 +136,7 @@ async function sendAudio() {
     setStatus("Ready.");
     refresh(); // monitoring reflects the new interaction immediately
   } catch (err) {
-    console.error(err);
+    console.error("[chat] request failed:", err);
     setStatus("Request failed. Is the server running?");
   } finally {
     isBusy = false;
@@ -154,23 +186,30 @@ function renderTurn(data) {
   coach.scrollIntoView({ behavior: "smooth", block: "end" });
 }
 
-// Mouse / touch: hold to talk.
-micBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); startRecording(); });
-micBtn.addEventListener("pointerup", (e) => { e.preventDefault(); stopRecording(); });
-micBtn.addEventListener("pointerleave", () => stopRecording());
-micBtn.addEventListener("pointercancel", () => stopRecording());
+// Mouse / touch: hold to talk. Pointer capture keeps pointerup targeted at the
+// button even if the cursor drifts off it while holding.
+micBtn.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  try { micBtn.setPointerCapture(e.pointerId); } catch (_) {}
+  beginTalk();
+});
+micBtn.addEventListener("pointerup", (e) => { e.preventDefault(); endTalk(); });
+micBtn.addEventListener("pointercancel", () => endTalk());
 
 // Keyboard: hold Space to talk (ignored while typing in a field).
+const isTypingTarget = (el) =>
+  el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+
 document.addEventListener("keydown", (e) => {
-  if (e.code === "Space" && !e.repeat && e.target === document.body) {
+  if (e.code === "Space" && !e.repeat && !isTypingTarget(e.target)) {
     e.preventDefault();
-    startRecording();
+    beginTalk();
   }
 });
 document.addEventListener("keyup", (e) => {
-  if (e.code === "Space" && e.target === document.body) {
+  if (e.code === "Space" && !isTypingTarget(e.target)) {
     e.preventDefault();
-    stopRecording();
+    endTalk();
   }
 });
 
